@@ -1,12 +1,63 @@
+export async function POST(request) {
+  const { env, cf, ctx } = getRequestContext();
+  const req_url = new URL(request.url);
+  const Referer = request.headers.get('Referer') || "Referer";
+  const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || request.socket.remoteAddress;
+  const clientIp = ip ? ip.split(',')[0].trim() : 'IP not found';
+
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file');
+    if (!file) {
+      return new Response('No file uploaded', { status: 400 });
+    }
+
+    // 生成带时间戳的文件名
+    const originalFileName = file.name || 'image';
+    const timestamp = Date.now(); // 当前时间戳
+    const extension = originalFileName.split('.').pop(); // 获取文件扩展名
+    const filename = `${originalFileName.split('.')[0]}_${timestamp}.${extension}`; // 拼接新文件名
+
+    // 上传到 R2
+    const object = await env.IMGRS.put(filename, file.stream(), {
+      httpMetadata: { contentType: file.type },
+    });
+
+    if (!object) {
+      return Response.json({
+        status: 500,
+        message: 'Failed to upload file to R2',
+        success: false,
+      }, { status: 500 });
+    }
+
+    // 返回带时间戳的文件链接
+    const data = {
+      url: `${req_url.origin}/api/rfile/${filename}`,
+      code: 200,
+      name: filename,
+    };
+
+    return Response.json(data, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    return Response.json({
+      status: 500,
+      message: error.message,
+      success: false,
+    }, { status: 500 });
+  }
+}
+
 export const runtime = 'edge';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 
-
-
-
 export async function POST(request) {
-
-
 
 	const { env, cf, ctx } = getRequestContext();
 
@@ -21,12 +72,7 @@ export async function POST(request) {
 		})
 	}
 
-
-
-
 	const req_url = new URL(request.url);
-
-
 
 	const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || request.socket.remoteAddress;
 	const clientIp = ip ? ip.split(',')[0].trim() : 'IP not found';
@@ -41,17 +87,12 @@ export async function POST(request) {
 	header.set("content-type", fileType)
 	header.set("content-length", `${file.size}`)
 
-
 	const corsHeaders = {
 		'Access-Control-Allow-Origin': '*',
 		'Access-Control-Allow-Headers': 'Content-Type',
 		'Access-Control-Max-Age': '86400', // 24 hours
 		'Content-Type': 'application/json'
 	};
-
-
-
-
 
 	try {
 
@@ -104,11 +145,9 @@ export async function POST(request) {
 					headers: corsHeaders,
 				})
 
-
 			} catch (error) {
 				console.log(error);
 				await insertImageData(env.IMG, `/rfile/${filename}`, Referer, clientIp, -1, nowTime);
-
 
 				return Response.json({
 					"msg": error.message
@@ -118,9 +157,6 @@ export async function POST(request) {
 				})
 			}
 		}
-
-
-
 
 	} catch (error) {
 		return Response.json({
@@ -132,13 +168,7 @@ export async function POST(request) {
 			headers: corsHeaders,
 		})
 	}
-
 }
-
-
-
-
-
 
 async function insertImageData(env, src, referer, ip, rating, time) {
 	try {
@@ -150,8 +180,6 @@ async function insertImageData(env, src, referer, ip, rating, time) {
 
 	};
 }
-
-
 
 async function get_nowTime() {
 	const options = {
@@ -168,10 +196,7 @@ async function get_nowTime() {
 	const formattedDate = new Intl.DateTimeFormat('zh-CN', options).format(timedata);
 
 	return formattedDate
-
 }
-
-
 
 async function getRating(env, url) {
 
@@ -191,7 +216,6 @@ async function getRating(env, url) {
 		} else {
 			return 0
 		}
-
 
 	} catch (error) {
 		return error
