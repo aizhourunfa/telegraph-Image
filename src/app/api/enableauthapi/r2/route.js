@@ -18,7 +18,7 @@ export async function POST(request) {
 
     // 生成带时间戳的文件名
     const timestamp = Date.now(); // 当前时间戳
-    const extension = file.name.split('.').pop(); // 获取文件扩展名
+    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'unknown'; // 处理无扩展名情况
     const filename = `${timestamp}.${extension}`; // 使用时间戳作为文件名
 
     // 上传到 R2
@@ -27,11 +27,8 @@ export async function POST(request) {
     });
 
     if (!object) {
-      return Response.json({
-        status: 500,
-        message: 'Failed to upload file to R2',
-        success: false,
-      }, { status: 500 });
+      console.error('Failed to upload file to R2');
+      return new Response('Failed to upload file to R2', { status: 500 });
     }
 
     // 返回带时间戳的文件链接
@@ -41,9 +38,9 @@ export async function POST(request) {
       name: filename,
     };
 
-    return Response.json(data, {
+    return new Response(JSON.stringify(data), {
       status: 200,
-      headers: corsHeaders,
+      headers: corsHeaders || {}, // 确保 corsHeaders 已定义
     });
   } catch (error) {
     console.error('Error uploading file:', error);
