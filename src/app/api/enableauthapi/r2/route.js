@@ -3,18 +3,11 @@ import { getRequestContext } from '@cloudflare/next-on-pages';
 export const runtime = 'edge';
 
 export async function POST(request) {
-  const { env, cf, ctx } = getRequestContext();
+  const { env } = getRequestContext();
   const req_url = new URL(request.url);
   const Referer = request.headers.get('Referer') || "Referer";
   const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || request.socket.remoteAddress;
   const clientIp = ip ? ip.split(',')[0].trim() : 'IP not found';
-
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '86400', // 24 hours
-    'Content-Type': 'application/json',
-  };
 
   try {
     const formData = await request.formData();
@@ -24,10 +17,9 @@ export async function POST(request) {
     }
 
     // 生成带时间戳的文件名
-    const originalFileName = file.name || 'image';
     const timestamp = Date.now(); // 当前时间戳
-    const extension = originalFileName.split('.').pop(); // 获取文件扩展名
-    const filename = `${originalFileName.split('.')[0]}_${timestamp}.${extension}`; // 拼接新文件名
+    const extension = file.name.split('.').pop(); // 获取文件扩展名
+    const filename = `${timestamp}.${extension}`; // 使用时间戳作为文件名
 
     // 上传到 R2
     const object = await env.IMGRS.put(filename, file.stream(), {
@@ -54,11 +46,8 @@ export async function POST(request) {
       headers: corsHeaders,
     });
   } catch (error) {
-    return Response.json({
-      status: 500,
-      message: error.message,
-      success: false,
-    }, { status: 500 });
+    console.error('Error uploading file:', error);
+    return new Response('Internal Server Error', { status: 500 });
   }
 }
 
